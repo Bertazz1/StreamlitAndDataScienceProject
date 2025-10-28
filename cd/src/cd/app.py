@@ -22,12 +22,16 @@ def carregar_dados(ficheiro_carregado):
             colunas_essenciais = [
                 'data_inversa', 'classificacao_acidente', 'uf', 'dia_semana', 
                 'causa_acidente', 'tipo_pista', 'condicao_metereologica', 
-                'mortos', 'tipo_acidente', 'horario', 'latitude', 'longitude', 'tipo_veiculo'
+                'mortos', 'tipo_acidente', 'horario', 'latitude', 'longitude', 'tipo_veiculo', 'idade'
             ]
             df.dropna(subset=colunas_essenciais, inplace=True)
             
             df['mortos'] = pd.to_numeric(df['mortos'], errors='coerce').fillna(0).astype(int)
-            
+            df['idade'] = pd.to_numeric(df['idade'], errors='coerce')
+            df.dropna(subset=['idade'], inplace=True)
+            df['idade'] = df['idade'].astype(int)
+
+            df = df[(df['idade'] >= 16) & (df['idade'] < 100)]
             return df
         except Exception as e:
             st.error(f"Ocorreu um erro ao ler o ficheiro: {e}")
@@ -147,8 +151,22 @@ if ficheiro_csv is not None:
             heatmap_pivot = heatmap_data.pivot_table(index='dia_semana', columns='hora', values='contagem', fill_value=0)
             ordem_dias = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"]
             heatmap_pivot = heatmap_pivot.reindex(ordem_dias)
-            fig_heatmap = px.imshow(heatmap_pivot, labels=dict(x="Hora do Dia", y="Dia da Semana", color="Nº de Acidentes"), title="Concentração de Acidentes por Dia e Hora")
+            fig_heatmap = px.imshow(heatmap_pivot, labels=dict(x="Hora do Dia", y="Dia da Semana", color="Nº de Acidentes"), title="Concentração de Acidentes por Dia e Hora",color_continuous_scale="Hot_r")
             st.plotly_chart(fig_heatmap, use_container_width=True)
+            
+            st.divider()
+
+            st.subheader("Análise da Idade dos Envolvidos por Gravidade do Acidente")
+            st.markdown("O gráfico abaixo mostra a distribuição da idade dos envolvidos nos acidentes, separada pela classificação de gravidade. Isso ajuda a entender se certas faixas etárias estão mais associadas a acidentes mais ou menos graves.")
+            fig_idade = px.box(df_analise, 
+                               x='classificacao_acidente', 
+                               y='idade',
+                               color='classificacao_acidente',
+                               labels={'classificacao_acidente': 'Gravidade do Acidente', 'idade': 'Idade dos Envolvidos'},
+                               title="Distribuição de Idade por Gravidade do Acidente")
+            fig_idade.update_layout(xaxis_title="Gravidade do Acidente", yaxis_title="Idade")
+            st.plotly_chart(fig_idade, use_container_width=True)
+    
             
             st.divider()
 
@@ -237,12 +255,7 @@ if ficheiro_csv is not None:
                     }
                     previsao, prob = fazer_previsao(modelo_morte, cols_morte, input_data_m)
                     st.subheader("Resultado da Previsão:")
-                    resultado = "Provável Morte" if previsao[0] == 1 else "Provável Sem Morte"
-                    
-                    if resultado == "Provável Morte":
-                        st.error(f"**Resultado:** {resultado}")
-                    else:
-                        st.success(f"**Resultado:** {resultado}")
+                
                     
                     prob_df = pd.DataFrame(prob, columns=["Sem Morte", "Com Morte(s)"], index=["Probabilidade"])
                     st.dataframe(prob_df)
